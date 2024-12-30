@@ -7,18 +7,17 @@
       url = "github:numtide/flake-utils";
       inputs.systems.follows = "systems";
     };
-    nix-jebrains-plugins.url = "github:theCapypara/nix-jebrains-plugins";
+    nix-jebrains-plugins = {
+      url = "github:theCapypara/nix-jebrains-plugins";
+      inputs = {
+        flake-utils.follows = "flake-utils";
+        systems.follows = "systems";
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      nix-jebrains-plugins,
-      ...
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+  outputs = { self, nixpkgs, flake-utils, nix-jebrains-plugins, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         javaVersion = 21;
         extraIdeaPlugins = [
@@ -32,28 +31,21 @@
           overlays = [ self.overlays.${system}.default ];
         };
         lib = pkgs.lib;
-      in
-      {
-        overlays.default = (
-          final: prev:
-          let
-            jdk = prev."jdk${toString javaVersion}";
-          in
-          {
+      in {
+        overlays.default = (final: prev:
+          let jdk = prev."jdk${toString javaVersion}";
+          in {
             maven = prev.maven.override { jdk_headless = jdk; };
             gradle = prev.gradle.override { java = jdk; };
             kotlin = prev.kotlin.override { jre = jdk; };
             my_jdk = jdk;
-          }
-        );
+          });
 
-        packages.jetbrainsIde = (
-          pkgs.jetbrains.plugins.addPlugins pkgs.jetbrains.idea-community-bin (
-            map (plugin: nix-jebrains-plugins.plugins.${system}.idea-community."2024.3".${plugin}) (
-              [ "com.demonwav.minecraft-dev" ] ++ extraIdeaPlugins
-            )
-          )
-        );
+        packages.jetbrainsIde =
+          (pkgs.jetbrains.plugins.addPlugins pkgs.jetbrains.idea-community-bin
+            (map (plugin:
+              nix-jebrains-plugins.plugins.${system}.idea-community."2024.3".${plugin})
+              ([ "com.demonwav.minecraft-dev" ] ++ extraIdeaPlugins)));
 
         devShells = {
           default = pkgs.mkShell rec {
@@ -91,9 +83,9 @@
               xorg.xrandr # needed for LWJGL [2.9.2, 3) https://github.com/LWJGL/lwjgl/issues/128
             ];
 
-            LD_LIBRARY_PATH = lib.makeLibraryPath (buildInputs ++ nativeBuildInputs);
+            LD_LIBRARY_PATH =
+              lib.makeLibraryPath (buildInputs ++ nativeBuildInputs);
           };
         };
-      }
-    );
+      });
 }
